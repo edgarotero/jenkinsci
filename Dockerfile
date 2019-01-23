@@ -2,12 +2,21 @@ FROM openjdk:8-jdk-stretch
 
 RUN apt-get update && apt-get install -y git curl sudo && rm -rf /var/lib/apt/lists/*
 
+# Install pip and awscli
+RUN if command pip >/dev/null 2>&1; then \
+        echo "pip already installed. Skipping manual installation."; \
+    else \
+        echo "Installing pip manually"; \
+        curl -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py && \
+            chmod 755 /tmp/get-pip.py && \
+            /tmp/get-pip.py && \
+            rm /tmp/get-pip.py; \
+    fi
+RUN pip install awscli
+
 # Install nodejs, npm and serverless
 RUN curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-RUN apt-get update && apt-get install -y \
-    nodejs \
-    npm
-RUN npm install -g serverless
+RUN apt-get update && apt-get install -y nodejs npm && npm install -g serverless
 
 ARG user=jenkins
 ARG group=jenkins
@@ -21,8 +30,8 @@ ENV JENKINS_HOME $JENKINS_HOME
 ENV JENKINS_SLAVE_AGENT_PORT ${agent_port}
 
 # Add certificates
-COPY ssl_certs/jenkins.crt /var/lib/jenkins/cert
-COPY ssl_certs/jenkins.pem /var/lib/jenkins/pk
+COPY keys/jenkins.crt /var/lib/jenkins/cert
+COPY keys/jenkins.pem /var/lib/jenkins/pk
 ENV JENKINS_OPTS --httpPort=-1 --httpsPort=8083 --httpsCertificate=/var/lib/jenkins/cert --httpsPrivateKey=/var/lib/jenkins/pk
 
 # Jenkins is run with user `jenkins`, uid = 1000
@@ -44,7 +53,7 @@ RUN mkdir -p /usr/share/jenkins/ref/init.groovy.d
 
 # Use tini as subreaper in Docker container to adopt zombie processes
 ARG TINI_VERSION=v0.16.1
-COPY tini_pub.gpg ${JENKINS_HOME}/tini_pub.gpg
+COPY keys/tini_pub.gpg ${JENKINS_HOME}/tini_pub.gpg
 RUN curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-$(dpkg --print-architecture) -o /sbin/tini \
   && curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-$(dpkg --print-architecture).asc -o /sbin/tini.asc \
   && gpg --no-tty --import ${JENKINS_HOME}/tini_pub.gpg \
@@ -84,11 +93,11 @@ ENV COPY_REFERENCE_FILE_LOG $JENKINS_HOME/copy_reference_file.log
 
 USER ${user}
 
-COPY jenkins-support /usr/local/bin/jenkins-support
-COPY jenkins.sh /usr/local/bin/jenkins.sh
-COPY tini-shim.sh /bin/tini
+COPY scripts/jenkins-support /usr/local/bin/jenkins-support
+COPY scripts/jenkins.sh /usr/local/bin/jenkins.sh
+COPY scripts/tini-shim.sh /bin/tini
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jenkins.sh"]
 
 # from a derived Dockerfile, can use `RUN plugins.sh active.txt` to setup /usr/share/jenkins/ref/plugins from a support bundle
-COPY plugins.sh /usr/local/bin/plugins.sh
-COPY install-plugins.sh /usr/local/bin/install-plugins.sh
+COPY scripts/plugins.sh /usr/local/bin/plugins.sh
+COPY scripts/install-plugins.sh /usr/local/bin/install-plugins.sh
