@@ -61,7 +61,7 @@ RUN curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}
   && rm -rf /sbin/tini.asc /root/.gnupg \
   && chmod +x /sbin/tini
 
-COPY init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
+COPY scripts/init.groovy /usr/share/jenkins/ref/init.groovy.d/tcp-slave-agent-port.groovy
 
 # jenkins version being bundled in this docker image
 ARG JENKINS_VERSION
